@@ -1,0 +1,105 @@
+name: OCaml Loong64 Support Update OLD
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout current repository (yzewei/ocaml)
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Set up Git
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+
+    - name: Add OCaml upstream remote
+      run: |
+        git remote add upstream https://github.com/ocaml/ocaml.git
+        git fetch upstream --tags
+
+    - name: Filter latest 15 relevant tags
+      id: get_tags
+      run: |
+        TAGS=$(git tag -l | grep -E '^[0-9]+\.[0-9]+(\.[0-9]+)?(-(alpha|beta|rc)[0-9]*)?(\+[a-zA-Z0-9._-]+)?$' | sort -V -r | head -n 15 | jq -R . | jq -cs .)
+        echo "TAGS=$TAGS" >> $GITHUB_ENV
+
+    - name: Process each tag
+      run: |
+        set -e
+        for tag in $(echo "$TAGS" | jq -r '.[]'); do
+          echo "Processing tag: $tag"
+          
+          # 规范化分支名称
+          SAFE_TAG_FOR_BRANCH=$(echo "$tag" | sed 's/[^a-zA-Z0-9._-]/_/g')
+          BRANCH_NAME="loong64/v${SAFE_TAG_FOR_BRANCH}"
+          
+          # 调试：打印环境信息
+          echo "Current dir: $(pwd)"
+          ls -la
+          # 重置远程配置
+          git remote rm origin || true  # 忽略错误如果origin不存在
+          git remote add origin "https://github.com/yzewei/ocaml.git"
+          
+          # 检查分支是否存在
+          if git show-ref --quiet "refs/remotes/origin/$BRANCH_NAME"; then
+            echo "Branch exists, checking out..."
+            git checkout -b "$BRANCH_NAME" "origin/$BRANCH_NAME"
+            git rebase "upstream/$tag"
+          else
+            echo "Creating new branch..."
+            git checkout -b "$BRANCH_NAME" "upstream/$tag"
+          fi
+
+          # 复制并执行脚本
+          cp "${GITHUB_WORKSPACE}/scripts/update.sh" .
+          cp "${GITHUB_WORKSPACE}/scripts/update-config-stack.patch" .
+          chmod +x ./update.sh
+          ./update.sh "$(pwd)" "$tag"
+          # 执行脚本并捕获错误
+          if ! bash -x ./update.sh "$(pwd)" "$tag"; then
+            echo "update.sh failed for $tag"
+            exit 1
+          fi
+
+          # 提交并推送
+          if ! git diff --quiet; then
+            git add .
+            git commit -m "feat: Add Loong64 support for $tag"
+            git push -u origin "$BRANCH_NAME"
+          else
+            echo "No changes detected for $tag"
+          fi
+        done
+
+    - name: Process trunk branch
+      run: |
+        set -e
+        git checkout trunk || git checkout -b trunk
+        git rebase upstream/trunk
+        
+        # 重置远程配置
+        git remote rm origin || true
+        git remote add origin "https://github.com/yzewei/ocaml.git"
+        
+        # 复制并执行脚本
+        cp "${GITHUB_WORKSPACE}/scripts/update.sh" .
+        cp "${GITHUB_WORKSPACE}/scripts/update-config-stack.patch" .
+        chmod +x ./update.sh
+        ./update.sh "$(pwd)" "trunk"
+
+        if ! git diff --quiet; then
+          git add .
+          git commit -m "feat: Update Loong64 support for trunk"
+          git push -u origin trunk
+        fi
