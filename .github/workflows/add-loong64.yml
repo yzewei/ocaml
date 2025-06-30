@@ -55,7 +55,7 @@ jobs:
             git rebase "upstream/$tag"
           else
             echo "Creating new branch..."
-            git checkout -b "$BRANCH_NAME" "upstream/tags/$tag"
+            git checkout -b "$BRANCH_NAME" "$tag"
           fi
 
           # 复制并执行脚本
