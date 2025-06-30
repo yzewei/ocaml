@@ -46,6 +46,13 @@ jobs:
           # 规范化分支名称
           SAFE_TAG_FOR_BRANCH=$(echo "$tag" | sed 's/[^a-zA-Z0-9._-]/_/g')
           BRANCH_NAME="loong64/v${SAFE_TAG_FOR_BRANCH}"
+
+          # 提前拷贝脚本
+          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
+          mkdir -p /tmp/loong64-scripts
+          cp "${GITHUB_WORKSPACE}/scripts/update.sh" /tmp/loong64-scripts/
+          cp "${GITHUB_WORKSPACE}/scripts/update-config-stack.patch" /tmp/loong64-scripts/
+    
           
           # 检查远程分支是否存在
           if git ls-remote --exit-code --heads origin "$BRANCH_NAME"; then
@@ -59,10 +66,10 @@ jobs:
           fi
 
           # 复制并执行脚本
-          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
-          ls -al "${GITHUB_WORKSPACE}/ocaml/scripts"
-          cp "${GITHUB_WORKSPACE}/scripts/update.sh" .
-          cp "${GITHUB_WORKSPACE}/scripts/update-config-stack.patch" .
+          #cp "${GITHUB_WORKSPACE}/scripts/update.sh" .
+          #cp "${GITHUB_WORKSPACE}/scripts/update-config-stack.patch" .
+          cp /tmp/loong64-scripts/update.sh .
+          cp /tmp/loong64-scripts/update-config-stack.patch .
           chmod +x ./update.sh
           
           if ! bash -x ./update.sh "$(pwd)" "$tag"; then
