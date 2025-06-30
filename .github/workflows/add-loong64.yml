@@ -59,6 +59,8 @@ jobs:
           fi
 
           # 复制并执行脚本
+          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
+          ls -al "${GITHUB_WORKSPACE}/ocaml/scripts"
           cp "${GITHUB_WORKSPACE}/scripts/update.sh" .
           cp "${GITHUB_WORKSPACE}/scripts/update-config-stack.patch" .
           chmod +x ./update.sh
